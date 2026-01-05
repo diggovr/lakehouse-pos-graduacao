@@ -32,7 +32,7 @@ def copiar_legado_para_raw(s3_client, bucket, file_name):
     origem_key = f"{LEGADO_PREFIX}/{file_name}"
     destino_key = f"{RAW_PREFIX}/ingest_ts={timestamp}/{file_name}"
 
-    print("[INFO] Iniciando cópia Legado → Raw")
+    print("[INFO] Iniciando copia Legado para Raw")
     print(f"       Origem : s3://{bucket}/{origem_key}")
     print(f"       Destino: s3://{bucket}/{destino_key}")
 

@@ -44,7 +44,7 @@ if not objects:
 latest_object = max(objects, key=lambda x: x["LastModified"])
 latest_key = latest_object["Key"]
 
-print("[INFO] Último arquivo RAW encontrado:")
+print("[INFO] Ultimo arquivo RAW encontrado:")
 print(f"       s3://{BUCKET_NAME}/{latest_key}")
 
 # =========================
@@ -138,5 +138,5 @@ for (ano, mes, dia), part in df.groupby(["_ano", "_mes", "_dia"]):
 
     s3.upload_file(local_parquet, BUCKET_NAME, s3_key)
 
-print("✅ TRUSTED GERADA COM SUCESSO (DATA COMO STRING)")
+print("TRUSTED GERADA COM SUCESSO")
 print(f"s3://{BUCKET_NAME}/{TRUSTED_PREFIX}")

@@ -39,7 +39,7 @@ s3 = session.client("s3")
 # =========================
 def limpar_s3_prefix(bucket: str, prefix: str):
 
-    print(f"🧹 Limpando S3: s3://{bucket}/{prefix}")
+    print(f"Limpando S3: s3://{bucket}/{prefix}")
 
     paginator = s3.get_paginator("list_objects_v2")
     pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
@@ -55,9 +55,9 @@ def limpar_s3_prefix(bucket: str, prefix: str):
             Bucket=bucket,
             Delete={"Objects": objects_to_delete}
         )
-        print("   ✔ Dados antigos removidos")
+        print("   Dados antigos removidos")
     else:
-        print("   ℹ Nenhum dado antigo encontrado")
+        print("   Nenhum dado antigo encontrado")
 
 # =========================
 # FUNÇÃO: EXECUTAR 1 SQL
@@ -75,7 +75,7 @@ def executar_sql_unico(query: str, descricao: str):
     )
 
     execution_id = response["QueryExecutionId"]
-    print(f"   ▶ {descricao} | QueryExecutionId: {execution_id}")
+    print(f"   {descricao} | QueryExecutionId: {execution_id}")
 
     while True:
         status_response = athena.get_query_execution(
@@ -103,8 +103,8 @@ def executar_ctas(sql_file: Path):
     table_name = sql_file.stem.replace("ctas_", "")
     curated_prefix = f"{CURATED_BASE_PREFIX}/{table_name}/"
 
-    print(f"\n🚀 Executando CTAS: {sql_file.name}")
-    print(f"   🧠 Tabela: lakehouse_curated.{table_name}")
+    print(f"\n Executando CTAS: {sql_file.name}")
+    print(f"   Tabela: lakehouse_curated.{table_name}")
 
     # 1️⃣ Limpar S3
     limpar_s3_prefix(
@@ -128,7 +128,7 @@ def executar_ctas(sql_file: Path):
         descricao=f"CTAS {table_name}"
     )
 
-    print(f"   ✅ CTAS concluída: {table_name}")
+    print(f"CTAS concluída: {table_name}")
 
 # =========================
 # EXECUÇÃO PRINCIPAL
@@ -136,7 +136,7 @@ def executar_ctas(sql_file: Path):
 if __name__ == "__main__":
 
     print("\n==============================")
-    print("🏁 INÍCIO PIPELINE CURATED")
+    print("INÍCIO PIPELINE CURATED")
     print("==============================")
 
     if not SQL_FOLDER.exists():
@@ -147,10 +147,10 @@ if __name__ == "__main__":
     if not sql_files:
         raise Exception("Nenhum arquivo SQL encontrado")
 
-    print(f"📂 Pasta de SQL encontrada:\n   {SQL_FOLDER}")
-    print(f"📄 CTAS encontradas: {len(sql_files)}")
+    print(f"Pasta de SQL encontrada:\n   {SQL_FOLDER}")
+    print(f"CTAS encontradas: {len(sql_files)}")
 
     for sql_file in sql_files:
         executar_ctas(sql_file)
 
-    print("\n🎉 PIPELINE CURATED FINALIZADO COM SUCESSO")
+    print("PIPELINE CURATED FINALIZADO COM SUCESSO")
