@@ -1,4 +1,4 @@
-lakehouse-dataops-pos-graduacao
+# Lakehouse-dataops-pos-graduacao
 
 Projeto educacional de Lakehouse na AWS com DataOps e CI/CD
 
