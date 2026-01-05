@@ -1,0 +1,156 @@
+import boto3
+import time
+from pathlib import Path
+
+# =========================
+# CONFIGURAÇÕES GERAIS
+# =========================
+AWS_PROFILE = "pos_dados"
+AWS_REGION = "us-east-1"
+
+ATHENA_DATABASE = "lakehouse_curated"
+ATHENA_OUTPUT = "s3://pos-graduacao-lakehouse/athena-query-results/"
+
+CURATED_BUCKET = "pos-graduacao-lakehouse"
+CURATED_BASE_PREFIX = "curated"
+
+
+POLL_INTERVAL_SECONDS = 2
+
+# =========================
+# RESOLVER PATH DO PROJETO
+# =========================
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SQL_FOLDER = PROJECT_ROOT / "sql" / "curated_ctas"
+
+# =========================
+# SESSÃO AWS
+# =========================
+session = boto3.Session(
+    profile_name=AWS_PROFILE,
+    region_name=AWS_REGION
+)
+
+athena = session.client("athena")
+s3 = session.client("s3")
+
+# =========================
+# FUNÇÃO: LIMPAR PREFIX S3
+# =========================
+def limpar_s3_prefix(bucket: str, prefix: str):
+
+    print(f"🧹 Limpando S3: s3://{bucket}/{prefix}")
+
+    paginator = s3.get_paginator("list_objects_v2")
+    pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
+
+    objects_to_delete = []
+
+    for page in pages:
+        for obj in page.get("Contents", []):
+            objects_to_delete.append({"Key": obj["Key"]})
+
+    if objects_to_delete:
+        s3.delete_objects(
+            Bucket=bucket,
+            Delete={"Objects": objects_to_delete}
+        )
+        print("   ✔ Dados antigos removidos")
+    else:
+        print("   ℹ Nenhum dado antigo encontrado")
+
+# =========================
+# FUNÇÃO: EXECUTAR 1 SQL
+# =========================
+def executar_sql_unico(query: str, descricao: str):
+
+    response = athena.start_query_execution(
+        QueryString=query,
+        QueryExecutionContext={
+            "Database": ATHENA_DATABASE
+        },
+        ResultConfiguration={
+            "OutputLocation": ATHENA_OUTPUT
+        }
+    )
+
+    execution_id = response["QueryExecutionId"]
+    print(f"   ▶ {descricao} | QueryExecutionId: {execution_id}")
+
+    while True:
+        status_response = athena.get_query_execution(
+            QueryExecutionId=execution_id
+        )
+
+        status = status_response["QueryExecution"]["Status"]["State"]
+
+        if status in ["SUCCEEDED", "FAILED", "CANCELLED"]:
+            break
+
+        time.sleep(POLL_INTERVAL_SECONDS)
+
+    if status != "SUCCEEDED":
+        reason = status_response["QueryExecution"]["Status"].get(
+            "StateChangeReason", "Motivo não informado"
+        )
+        raise Exception(f"{descricao} falhou: {reason}")
+
+# =========================
+# FUNÇÃO: EXECUTAR CTAS
+# =========================
+def executar_ctas(sql_file: Path):
+
+    table_name = sql_file.stem.replace("ctas_", "")
+    curated_prefix = f"{CURATED_BASE_PREFIX}/{table_name}/"
+
+    print(f"\n🚀 Executando CTAS: {sql_file.name}")
+    print(f"   🧠 Tabela: lakehouse_curated.{table_name}")
+
+    # 1️⃣ Limpar S3
+    limpar_s3_prefix(
+        bucket=CURATED_BUCKET,
+        prefix=curated_prefix
+    )
+
+    # 2️⃣ DROP TABLE
+    drop_query = f"DROP TABLE IF EXISTS lakehouse_curated.{table_name};"
+    executar_sql_unico(
+        query=drop_query,
+        descricao=f"DROP {table_name}"
+    )
+
+    # 3️⃣ CREATE TABLE AS SELECT
+    with open(sql_file, "r", encoding="utf-8") as f:
+        ctas_query = f.read().strip()
+
+    executar_sql_unico(
+        query=ctas_query,
+        descricao=f"CTAS {table_name}"
+    )
+
+    print(f"   ✅ CTAS concluída: {table_name}")
+
+# =========================
+# EXECUÇÃO PRINCIPAL
+# =========================
+if __name__ == "__main__":
+
+    print("\n==============================")
+    print("🏁 INÍCIO PIPELINE CURATED")
+    print("==============================")
+
+    if not SQL_FOLDER.exists():
+        raise FileNotFoundError(f"Pasta SQL não encontrada: {SQL_FOLDER}")
+
+    sql_files = sorted(SQL_FOLDER.glob("*.sql"))
+
+    if not sql_files:
+        raise Exception("Nenhum arquivo SQL encontrado")
+
+    print(f"📂 Pasta de SQL encontrada:\n   {SQL_FOLDER}")
+    print(f"📄 CTAS encontradas: {len(sql_files)}")
+
+    for sql_file in sql_files:
+        executar_ctas(sql_file)
+
+    print("\n🎉 PIPELINE CURATED FINALIZADO COM SUCESSO")
